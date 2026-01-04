@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Define New Object</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label for="prompt" class="form-label">Describe your object</label>
+        <textarea class="form-control" id="prompt" name="prompt" rows="3"
+            placeholder="e.g. Create a Book table with title, author and year published"></textarea>
+        <div class="form-text">This will use an LLM to generate the SQL table definition.</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Generate & Create</button>
+</form>
+
+{% if error %}
+<div class="alert alert-danger mt-3">{{ error }}</div>
+{% endif %}
+{% endblock %}

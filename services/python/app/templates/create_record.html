@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Add {{ table_name }}</h2>
+<form method="POST">
+    {% for col in columns %}
+    {% if not col.default and col.name != 'id' %}
+    {# Simple heuristic: skip ID (usually auto) and defaults (unless required?). For MVP, skip ID. #}
+    <div class="mb-3">
+        <label for="{{ col.name }}" class="form-label">{{ col.name }} ({{ col.type }})</label>
+
+        {% if 'int' in col.type %}
+        <input type="number" class="form-control" name="{{ col.name }}" {% if not col.nullable %}required{% endif %}>
+        {% elif 'bool' in col.type %}
+        <select class="form-select" name="{{ col.name }}">
+            <option value="true">True</option>
+            <option value="false">False</option>
+        </select>
+        {% else %}
+        <input type="text" class="form-control" name="{{ col.name }}" {% if not col.nullable %}required{% endif %}>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endblock %}
