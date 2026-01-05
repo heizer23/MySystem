@@ -1,33 +1,126 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>{{ table_name }}</h2>
-    <a href="/object/{{ table_name }}/create" class="btn btn-success">Add Record</a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="/">Objects</a></li>
+            <li class="breadcrumb-item active">{{ table_name }}</li>
+        </ol>
+    </nav>
+    <div>
+        <a href="/object/{{ table_name }}/create" class="btn btn-success">Add Record</a>
+    </div>
+</div>
+
+<!-- Filter & Sort Bar -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">Sort By</span>
+                    <select name="sort" class="form-select" onchange="this.form.submit()">
+                        <option value="">(None)</option>
+                        {% for col in columns %}
+                        <option value="{{ col.name }}" {% if current_sort==col.name %}selected{% endif %}>{{ col.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="order" class="form-select" onchange="this.form.submit()">
+                    <option value="ASC" {% if current_order=='ASC' %}selected{% endif %}>Ascending</option>
+                    <option value="DESC" {% if current_order=='DESC' %}selected{% endif %}>Descending</option>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text">Filter</span>
+                    <input type="text" class="form-control" id="filterInput" placeholder="column:value (e.g. name:test)"
+                        onkeypress="handleFilter(event)">
+                    <button type="button" class="btn btn-outline-secondary" onclick="applyFilter()">Apply</button>
+                    <a href="{{ url_for('view_object_ui', table=table_name) }}" class="btn btn-outline-danger">Reset</a>
+                </div>
+                <small class="text-muted">Use <code>f_columnName=value</code> in URL or format <code>col:val</code>
+                    above.</small>
+            </div>
+
+            {% for k, v in current_filters.items() %}
+            <input type="hidden" name="f_{{ k }}" value="{{ v }}">
+            {% endfor %}
+        </form>
+    </div>
 </div>
 
 <div class="table-responsive">
-    <table class="table table-striped">
-        <thead>
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
             <tr>
                 {% for col in columns %}
-                <th>{{ col.name }}</th>
+                <th>
+                    {{ col.name }}
+                    {% if col.is_pk %}<span class="badge bg-primary">PK</span>{% endif %}
+                </th>
                 {% endfor %}
+                <th class="text-end">Actions</th>
             </tr>
         </thead>
         <tbody>
+            {% set ns = namespace(pk_idx=-1) %}
+            {% for col in columns %}
+            {% if col.is_pk %}{% set ns.pk_idx = loop.index0 %}{% endif %}
+            {% endfor %}
+
             {% for row in rows %}
+            {% set row_id = row[ns.pk_idx] %}
             <tr>
                 {% for cell in row %}
                 <td>{{ cell }}</td>
                 {% endfor %}
+                <td class="text-end">
+                    <div class="d-flex justify-content-end gap-1">
+                        <a href="{{ url_for('edit_record_ui', table=table_name, id=row_id) }}"
+                            class="btn btn-sm btn-outline-primary">Edit</a>
+
+                        <form method="POST" action="{{ url_for('duplicate_record_ui', table=table_name, id=row_id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success">Copy</button>
+                        </form>
+
+                        <form method="POST" action="{{ url_for('delete_record_ui', table=table_name, id=row_id) }}"
+                            onsubmit="return confirm('Really delete record {{ row_id }}?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                        </form>
+                    </div>
+                </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="{{ columns|length }}" class="text-center">No records found.</td>
+                <td colspan="{{ columns|length + 1 }}" class="text-center py-4 text-muted">No records found.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+    function applyFilter() {
+        const input = document.getElementById('filterInput').value;
+        if (!input.includes(':')) {
+            alert('Please use column:value');
+            return;
+        }
+        const [col, val] = input.split(':');
+        const url = new URL(window.location.href);
+        url.searchParams.set('f_' + col.trim(), val.trim());
+        window.location.href = url.toString();
+    }
+    function handleFilter(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyFilter();
+        }
+    }
+</script>
 {% endblock %}

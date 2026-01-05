@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('view_object_ui', table=table_name) }}" class="btn btn-outline-secondary btn-sm">← Back to
+        List</a>
+</div>
+
+<h2>Edit {{ table_name }} Record</h2>
+
+<div class="card card-body mb-4">
+    <form method="POST">
+        {% for col in columns %}
+        {% if not col.is_pk and col.name != 'created_at' and col.name != 'updated_at' %}
+        <div class="mb-3">
+            <label for="{{ col.name }}" class="form-label">{{ col.name }} ({{ col.type }})</label>
+
+            {% if 'int' in col.type %}
+            <input type="number" class="form-control" name="{{ col.name }}" value="{{ record[col.name] }}" {% if not
+                col.nullable %}required{% endif %}>
+            {% elif 'bool' in col.type %}
+            <select class="form-select" name="{{ col.name }}">
+                <option value="true" {% if record[col.name] %}selected{% endif %}>True</option>
+                <option value="false" {% if not record[col.name] %}selected{% endif %}>False</option>
+            </select>
+            {% else %}
+            <input type="text" class="form-control" name="{{ col.name }}" value="{{ record[col.name] or '' }}" {% if not
+                col.nullable %}required{% endif %}>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        <hr>
+        <div class="d-flex justify-content-between">
+            <button type="submit" class="btn btn-primary">Update Record</button>
+            <!-- No nested form, just a button linking to the external form -->
+            <button type="submit" form="realDeleteForm" class="btn btn-danger">Delete</button>
+        </div>
+    </form>
+</div>
+
+<!-- Separate Delete Form - No Nesting -->
+<form id="realDeleteForm" method="POST"
+    action="{{ url_for('delete_record_ui', table=table_name, id=record[columns|selectattr('is_pk')|map(attribute='name')|first]) }}"
+    onsubmit="return confirm('Are you sure you want to delete this record?')">
+</form>
+
+{% endblock %}

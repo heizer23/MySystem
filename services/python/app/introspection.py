@@ -1,6 +1,4 @@
 import psycopg2
-from flask import current_app
-
 import os
 
 def get_db_connection():
@@ -46,16 +44,17 @@ def get_table_details(table_name):
             "type": row[1],
             "nullable": row[2] == 'YES',
             "default": row[3],
-            "is_pk": False  # Will update below
+            "is_pk": False
         })
 
-    # 2. Identify Primary Key
+    # 2. Identify Primary Key - More robust query
     cur.execute("""
         SELECT kcu.column_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.key_column_usage kcu
           ON tc.constraint_name = kcu.constraint_name
           AND tc.table_schema = kcu.table_schema
+          AND tc.table_name = kcu.table_name
         WHERE tc.constraint_type = 'PRIMARY KEY'
         AND tc.table_schema = 'app'
         AND tc.table_name = %s;

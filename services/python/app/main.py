@@ -6,12 +6,8 @@ app = Flask(__name__)
 
 # --- Lifecycle ---
 with app.app_context():
-    # Initialize DB (Schemas, Audit Table)
-    # Wrap in try/except in case DB isn't ready during build phase, 
-    # though Docker Compose healthcheck should prevent this in runtime.
     try:
         ddl.init_db()
-        print("Database initialized successfully.")
     except Exception as e:
         print(f"Warning: Database initialization failed: {e}")
 
@@ -40,8 +36,24 @@ def create_object_ui():
 def view_object_ui(table):
     try:
         columns = introspection.get_table_details(table)
-        rows = crud.list_records(table)
-        return render_template('view_object.html', table_name=table, columns=columns, rows=rows)
+        
+        # Sort and Filter from Query Params
+        sort_by = request.args.get('sort')
+        order = request.args.get('order', 'ASC')
+        
+        filters = {}
+        for key, value in request.args.items():
+            if key.startswith('f_'):
+                filters[key[2:]] = value
+        
+        rows = crud.list_records(table, filters=filters, sort_by=sort_by, order=order)
+        return render_template('view_object.html', 
+                               table_name=table, 
+                               columns=columns, 
+                               rows=rows, 
+                               current_sort=sort_by, 
+                               current_order=order,
+                               current_filters=filters)
     except Exception as e:
         return f"Error: {e}", 404
 
@@ -50,12 +62,45 @@ def create_record_ui(table):
     try:
         columns = introspection.get_table_details(table)
         if request.method == 'POST':
-            # Collect data from form
             data = request.form.to_dict()
             crud.create_record(table, data)
             return redirect(url_for('view_object_ui', table=table))
             
         return render_template('create_record.html', table_name=table, columns=columns)
+    except Exception as e:
+        return f"Error: {e}", 400
+
+@app.route('/object/<table>/edit/<id>', methods=['GET', 'POST'])
+def edit_record_ui(table, id):
+    try:
+        columns = introspection.get_table_details(table)
+        if request.method == 'POST':
+            data = request.form.to_dict()
+            crud.update_record(table, id, data)
+            return redirect(url_for('view_object_ui', table=table))
+            
+        record = crud.get_record(table, id)
+        # Convert tuple record to dict for template ease
+        col_names = [c['name'] for c in columns]
+        record_dict = dict(zip(col_names, record))
+        
+        return render_template('edit_record.html', table_name=table, columns=columns, record=record_dict)
+    except Exception as e:
+        return f"Error: {e}", 400
+
+@app.route('/object/<table>/delete/<id>', methods=['POST'])
+def delete_record_ui(table, id):
+    try:
+        crud.delete_record(table, id)
+        return redirect(url_for('view_object_ui', table=table))
+    except Exception as e:
+        return f"Error: {e}", 400
+
+@app.route('/object/<table>/duplicate/<id>', methods=['POST'])
+def duplicate_record_ui(table, id):
+    try:
+        crud.duplicate_record(table, id)
+        return redirect(url_for('view_object_ui', table=table))
     except Exception as e:
         return f"Error: {e}", 400
 
@@ -75,7 +120,11 @@ def api_object_details(table):
 @app.route('/api/objects/<table>/records', methods=['GET'])
 def api_list_records(table):
     try:
-        rows = crud.list_records(table)
+        sort_by = request.args.get('sort')
+        order = request.args.get('order', 'ASC')
+        filters = {k[2:]: v for k, v in request.args.items() if k.startswith('f_')}
+        
+        rows = crud.list_records(table, filters=filters, sort_by=sort_by, order=order)
         return jsonify(rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -86,6 +135,31 @@ def api_create_record(table):
         data = request.json
         crud.create_record(table, data)
         return jsonify({"status": "success"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/objects/<table>/records/<id>', methods=['PUT'])
+def api_update_record(table, id):
+    try:
+        data = request.json
+        crud.update_record(table, id, data)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/objects/<table>/records/<id>', methods=['DELETE'])
+def api_delete_record(table, id):
+    try:
+        crud.delete_record(table, id)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/objects/<table>/records/<id>/duplicate', methods=['POST'])
+def api_duplicate_record(table, id):
+    try:
+        crud.duplicate_record(table, id)
+        return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
